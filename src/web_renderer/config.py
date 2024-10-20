@@ -19,11 +19,12 @@ class BaseConfig(BaseSettings):
     logfile_store: str = root_folder
     temp_file_archive: str = f"{root_folder}/temp_archive"
 
-    ot_server: str
-    assets_base_url: str
-
-    chromium_path: str = Field(default_factory=executablePath)
-
+    browser_path: str = Field(default_factory=executablePath)
+    user_data_dir_path: str
+    whatsapp_web_url: str = Field(default="https://web.whatsapp.com")
+    whatsapp_web_send_button_selector: str = Field(
+        default="#main > footer > div.x1n2onr6.xhtitgo.x9f619.x78zum5.x1q0g3np.xuk3077.x193iq5w.x122xwht.x1bmpntp.xs9asl8.x1swvt13.x1pi30zi.xnpuxes.copyable-area > div > span > div > div._ak1r > div.x123j3cw.xs9asl8.x9f619.x78zum5.x6s0dn4.xl56j7k.x1ofbdpd.x100vrsf.x1fns5xo > button"
+    )
     max_cached: float = Field(default=100)  # max cached items in store
     cache_ttl: float = Field(default=18_000)  # 5 hours in seconds
 

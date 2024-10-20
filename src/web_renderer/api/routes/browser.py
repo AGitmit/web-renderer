@@ -3,7 +3,7 @@ import asyncio
 
 from fastapi import APIRouter, status, HTTPException
 from web_renderer.config import config as conf
-from web_renderer.clients.renderer import RendererClient, HeadlessBrowserClient
+from web_renderer.clients.renderer import HeadlessBrowserClient
 from web_renderer.schemas.requests import FetchRequest, PageActionRequest
 from web_renderer.schemas.responses import PageContentResponse
 from web_renderer.logger import logger

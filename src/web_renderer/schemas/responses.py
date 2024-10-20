@@ -4,12 +4,12 @@ from pydantic import BaseModel
 from typing import Annotated
 
 # relative imports
-from web_renderer.schemas.constants.part_name import PartName
+# from web_renderer.schemas.constants.part_name import PartName
 
 
 class Base64OfImageResponse(BaseModel):
     transaction_id: uuid.UUID
-    image_type: PartName
+    image_type: str
     base64: Annotated[str, "base64 of an image"]
 
 

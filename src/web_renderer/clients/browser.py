@@ -7,6 +7,7 @@ import pydantic as pyd
 
 from contextlib import asynccontextmanager
 
+import pyppeteer.chromium_downloader
 import pyppeteer.page
 from web_renderer.config import config as conf
 from web_renderer.logger import log_execution_metrics, logger
@@ -20,36 +21,47 @@ class HeadlessBrowserClient:
     browser = None
 
     @classmethod
-    async def get_browser(cls):
+    async def get_browser(cls, **kwargs):
         "Get the browser's instance; created a new browser if none in already running"
-        if cls.browser is None:
-            config = dict(
-                headless=True,
-                autoClose=False,
-                args=[
-                    "--disable-web-security",
-                    "--host-resolver-rules=MAP localhost 127.0.0.1",
-                    "--disable-gpu",
-                    "--no-sandbox",
-                    "--disable-dev-shm-usage",
-                ],
-                executablePath=conf.chromium_path,
-            )
+        try:
+            if cls.browser is None:
+                # if not pyppeteer.chromium_downloader.check_chromium():
+                #     pyppeteer.chromium_downloader.download_chromium()
 
-            cls.browser = await pyppeteer.launch(**config)
-
-            atexit.register(cls.close_browser)
-        return cls.browser
+                config = dict(
+                    headless=kwargs.get("headless", True),
+                    autoClose=kwargs.get("autoClose", False),
+                    args=[
+                        "--disable-web-security",
+                        "--host-resolver-rules=MAP localhost 127.0.0.1",
+                        "--disable-gpu",
+                        "--no-sandbox",
+                        "--disable-dev-shm-usage",
+                    ],
+                    executablePath=conf.browser_path,
+                    userDataDir=conf.user_data_dir_path,
+                )
+                cls.browser = await pyppeteer.launch(**config)
+                atexit.register(cls.close_browser)
+            return cls.browser
+        except Exception as e:
+            logger.error(e)
+            raise
 
     @classmethod
     @asynccontextmanager
-    async def get_new_page(cls):
-        browser = await cls.get_browser()
+    async def get_new_page(cls, one_time_use: bool = False, **kwargs):
+        browser = await cls.get_browser(**kwargs)
         new_page = await browser.newPage()
         try:
             yield new_page
+        except Exception as e:
+            logger.error(f"Page exception: {e}")
         finally:
             await new_page.close()
+            if one_time_use:
+                await cls.browser.close()
+                cls.browser = None
 
     @classmethod
     def close_browser(cls) -> None:
@@ -118,30 +130,37 @@ class HeadlessBrowserClient:
     @pyd.validate_arguments
     @log_execution_metrics
     async def page_action(cls, page: pyppeteer.page.Page, action: PageActionType, **kwargs) -> dict:
-        match action:
-            case PageActionType.CLICK:
-                selector = kwargs.pop("selector")
-                options = kwargs.pop("options", None)
-                await page.waitForSelector(selector)
-                await page.click(selector, options)
-            case PageActionType.AUTHENTICATE:
-                credentials = kwargs.pop("credentials")
-                await page.authenticate(credentials)
-            case PageActionType.SET_USER_AGENT:
-                user_agent = kwargs.pop("user_agent")
-                await page.setUserAgent(user_agent)
-            case PageActionType.SCREENSHOT:
-                options = kwargs.pop("options", None)
-                await page.screenshot(options)
-            case PageActionType.GOTO:
-                url = kwargs.pop("url")
-                options = kwargs.pop("options", None)
-                await page.goto(url, options)
-            case PageActionType.GO_BACK:
-                options = kwargs.pop("options", None)
-                await page.goBack(options)
-            case PageActionType.GO_FORWARD:
-                options = kwargs.pop("options", None)
-                await page.goForward(options)
+        try:
+            match action:
+                case PageActionType.CLICK:
+                    selector = kwargs.pop("selector")
+                    options = kwargs.pop("options", None)
+                    await page.waitForSelector(selector)
+                    await page.click(selector, options)
+                case PageActionType.AUTHENTICATE:
+                    credentials = kwargs.pop("credentials")
+                    await page.authenticate(credentials)
+                case PageActionType.SET_USER_AGENT:
+                    user_agent = kwargs.pop("user_agent")
+                    await page.setUserAgent(user_agent)
+                case PageActionType.SCREENSHOT:
+                    options = kwargs.pop("options", None)
+                    await page.screenshot(options)
+                case PageActionType.GOTO:
+                    url = kwargs.pop("url")
+                    options = kwargs.pop("options", None)
+                    await page.goto(url, options)
+                case PageActionType.GO_BACK:
+                    options = kwargs.pop("options", None)
+                    await page.goBack(options)
+                case PageActionType.GO_FORWARD:
+                    options = kwargs.pop("options", None)
+                    await page.goForward(options)
+                case PageActionType.ENTER:
+                    await page.keyboard.press("Enter")
 
-        return await cls.extract_page_contents(page)
+            return await cls.extract_page_contents(page)
+
+        except Exception as e:
+            logger.error(e)
+            raise

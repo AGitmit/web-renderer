@@ -5,6 +5,7 @@ import re
 from web_renderer.schemas import sanitize_str
 from web_renderer.schemas.constants.page_action_type import PageActionType
 
+
 # browser
 class FetchRequest(pyd.BaseModel):
     transaction_id: uuid.UUID
@@ -33,4 +34,15 @@ class PageActionRequest(pyd.BaseModel):
             raise ValueError(
                 f"Illegal characters found in '{value}' - allowed special characters are '-' or '_'"
             )
+        return value
+
+
+class WhatsAppRequest(pyd.BaseModel):
+    phone: str
+    content: str
+
+    @pyd.validator("phone")
+    def validate_phone(cls, value: str):
+        if not re.match(r"(\+[1-9]{3}\d{9})", value):
+            raise ValueError("Invalid phone number")
         return value
