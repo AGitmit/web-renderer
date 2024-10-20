@@ -34,3 +34,8 @@ class PageActionRequest(pyd.BaseModel):
                 f"Illegal characters found in '{value}' - allowed special characters are '-' or '_'"
             )
         return value
+
+class WhatsAppRequest(pyd.BaseModel):
+    phone: str
+    content: str
+    wait_time: int = pyd.Field(default=2)

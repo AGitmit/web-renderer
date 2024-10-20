@@ -2,6 +2,7 @@ from enum import Enum
 
 
 class PageActionType(Enum):
+    ENTER = "enter"
     CLICK = "click"
     AUTHENTICATE = "authenticate"
     SET_USER_AGENT = "set_ua"

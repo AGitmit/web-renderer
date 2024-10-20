@@ -7,6 +7,7 @@ import pydantic as pyd
 
 from contextlib import asynccontextmanager
 
+import pyppeteer.chromium_downloader
 import pyppeteer.page
 from web_renderer.config import config as conf
 from web_renderer.logger import log_execution_metrics, logger
@@ -22,24 +23,31 @@ class HeadlessBrowserClient:
     @classmethod
     async def get_browser(cls):
         "Get the browser's instance; created a new browser if none in already running"
-        if cls.browser is None:
-            config = dict(
-                headless=True,
-                autoClose=False,
-                args=[
-                    "--disable-web-security",
-                    "--host-resolver-rules=MAP localhost 127.0.0.1",
-                    "--disable-gpu",
-                    "--no-sandbox",
-                    "--disable-dev-shm-usage",
-                ],
-                executablePath=conf.chromium_path,
-            )
+        try:
+            if cls.browser is None:
+                if not pyppeteer.chromium_downloader.check_chromium():
+                    pyppeteer.chromium_downloader.download_chromium()
 
-            cls.browser = await pyppeteer.launch(**config)
+                config = dict(
+                    headless=False,
+                    autoClose=False,
+                    args=[
+                        "--disable-web-security",
+                        "--host-resolver-rules=MAP localhost 127.0.0.1",
+                        "--disable-gpu",
+                        "--no-sandbox",
+                        "--disable-dev-shm-usage",
+                    ],
+                    executablePath="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+                )
+                
+                cls.browser = await pyppeteer.launch(**config)
 
-            atexit.register(cls.close_browser)
-        return cls.browser
+                atexit.register(cls.close_browser)
+            return cls.browser
+        except Exception as e:
+            logger.error(e)
+            raise
 
     @classmethod
     @asynccontextmanager
@@ -143,5 +151,7 @@ class HeadlessBrowserClient:
             case PageActionType.GO_FORWARD:
                 options = kwargs.pop("options", None)
                 await page.goForward(options)
+            case PageActionType.ENTER:
+                await page.keyboard.press("Enter")
 
         return await cls.extract_page_contents(page)
