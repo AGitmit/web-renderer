@@ -1,6 +1,7 @@
 import asyncio
 
 from fastapi import FastAPI
+
 # relative imports
 from web_renderer.api.routes import router as IndexRouter
 from web_renderer.api.routes.browser import router as BrowserRouter
@@ -20,7 +21,8 @@ for router in [
 ]:
     app.include_router(router)
 
+
 @app.on_event("startup")
 async def whatsapp_msg_manager():
-    asyncio.create_task(WhatsAppClient.get_whatsapp_web())
+    # asyncio.create_task(WhatsAppClient.authorize_whatsapp_web())
     asyncio.create_task(WhatsAppClient.msg_manager())

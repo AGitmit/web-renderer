@@ -1,4 +1,3 @@
-import jinja2
 import pydantic as pyd
 
 from web_renderer.logger import log_execution_metrics

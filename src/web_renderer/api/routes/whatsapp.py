@@ -17,7 +17,7 @@ async def send_whatsapp_msg(args: WhatsAppRequest):
     try:
         WhatsAppClient.add_new_msg_to_queue(**args.dict())
         return JSONResponse(status_code=status.HTTP_201_CREATED, content={"status": "success"})
-    
+
     except asyncio.TimeoutError as e:
         msg = "Request has been timed-out!"
         logger.error(msg)

@@ -4,45 +4,64 @@ import pyppeteer
 from web_renderer.clients.renderer import HeadlessBrowserClient
 from web_renderer.logger import logger
 from web_renderer.schemas.constants.page_action_type import PageActionType
+from web_renderer.config import config as conf
+
 
 class WhatsAppClient:
-    _session_id = uuid.uuid4()
-    _whatsapp_web: pyppeteer.page.Page = None
+    _is_authorized = False
     _msg_queue = []
 
     @classmethod
-    async def get_whatsapp_web(cls):
-        if cls._whatsapp_web is None:
-            await HeadlessBrowserClient.start_page_session(cls._session_id)
-            cls._whatsapp_web = await HeadlessBrowserClient.retrieve_cached_page(cls._session_id)
-            await HeadlessBrowserClient.page_action(cls._whatsapp_web, PageActionType.GOTO, url=f"https://web.whatsapp.com")
-        return cls._whatsapp_web
-    
+    async def authorize_whatsapp_web(cls):
+        async with HeadlessBrowserClient.get_new_page(one_time_use=True, headless=False) as p:
+            await p.goto(conf.whatsapp_web_url)
+            input("Press any key after linking the device with WhatsApp web to continue...")
+            cls._is_authorized = True
+
     @classmethod
-    def add_new_msg_to_queue(cls, phone: str, content: str, wait_time: int = 2) -> bool: # add phone validation
+    def add_new_msg_to_queue(cls, phone: str, content: str) -> bool:  # add phone validation
         try:
-            cls._msg_queue.append((phone, content, wait_time))
+            cls._msg_queue.append((phone, content))
             return True
         except Exception as e:
             logger.error(e)
             return False
-    
+
     @classmethod
     async def msg_manager(cls):
         while True:
             if cls._msg_queue:
-                phone, content, wait_time = cls._msg_queue.pop(0)
-                await cls.send_msg(phone, content, wait_time)
+                phone, content = cls._msg_queue.pop(0)
+                await cls.send_msg(phone, content)
             await asyncio.sleep(1)
 
     @classmethod
-    async def send_msg(cls, phone: str, content: str, wait_time: int) -> bool:
+    async def send_msg(cls, phone: str, content: str) -> bool:
         try:
-            await HeadlessBrowserClient.page_action(await cls.get_whatsapp_web(), PageActionType.GOTO, url=f"https://web.whatsapp.com/send?phone={phone}&text={content}")
-            await asyncio.sleep(10)
-            await HeadlessBrowserClient.page_action(await cls.get_whatsapp_web(),PageActionType.CLICK, selector="#main > footer > div.x1n2onr6.xhtitgo.x9f619.x78zum5.x1q0g3np.xuk3077.x193iq5w.x122xwht.x1bmpntp.xs9asl8.x1swvt13.x1pi30zi.xnpuxes.copyable-area > div > span > div > div._ak1r > div.x123j3cw.xs9asl8.x9f619.x78zum5.x6s0dn4.xl56j7k.x1ofbdpd.x100vrsf.x1fns5xo > button")
-            logger.info(f"Message sent to {phone} successfully.")
+            if cls._is_authorized:
+                async with HeadlessBrowserClient.get_new_page(headless=True, autoClose=False) as p:
+                    p.setDefaultNavigationTimeout(30000)  # Set to 30 seconds
+                    await p.goto(
+                        f"{conf.whatsapp_web_url}/send/?phone={phone}&text={content}&type=phone_number&app_absent=0"
+                    )
+                    await p.waitForSelector(
+                        conf.whatsapp_web_send_button_selector, visible=True, timeout=10000
+                    )
+                    await p.keyboard.press("Enter")
+                    await asyncio.sleep(3)
+                logger.info(f"Message sent to {phone} successfully.")
+                return True
+
+            else:
+                await cls.authorize_whatsapp_web()
+                await cls.send_msg(phone, content)
+
+        except pyppeteer.errors.TimeoutError as e:
+            logger.error(
+                f"Failed to send message to {phone}; {e} - please verify that your device is authroized in WhatsApp web."
+            )
+            cls._is_authorized = False
+
         except Exception as e:
             logger.error(f"Failed to send message to {phone}; {e}")
             return False
-        return True
